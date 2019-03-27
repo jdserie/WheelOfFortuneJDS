@@ -3,6 +3,8 @@ import os
 
 os.system("cls||clear")
 
+# Scoring System dictionary - Based on Scrabble scoring system 
+
 guide = [
     {'letter':' ','point':0},
     {'letter':"'",'point':0},
@@ -35,6 +37,7 @@ guide = [
     {'letter':'Z','point':10}
 ]
 
+# create the board
 
 def print_board():
     tmp = ""
@@ -42,6 +45,7 @@ def print_board():
         tmp += f"{i} "
     print(tmp)
 
+# Guess Letters within the game when started
 
 def make_guess():
     counter = 0
@@ -93,6 +97,7 @@ def make_guess():
                 print("You earned " + total_str_host + " points!")
                 quit()
 
+# Game Board Exeptions
 
 def make_space_guess():
     counter = 0
@@ -119,6 +124,7 @@ def make_special_guess_2():
                 board[counter] = "-"
             counter += 1
 
+# Game Starting Page
 
 v = getpass.getpass("(ONLY USE: Letters, Dashes, Spaces, and Apostraphes)\nEnter the phrase/word for the puzzle: ")
 word = v.upper()
@@ -138,6 +144,8 @@ guess_wrong = ""
 
 for i in word:
     board.append("_")
+
+# Execute Game
 
 make_space_guess()
 make_special_guess()
