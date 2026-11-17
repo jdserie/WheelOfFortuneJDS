@@ -1,160 +1,117 @@
+"""Two-player word guessing game with a built-in solo practice puzzle."""
+import argparse
 import getpass
-import os
+import re
+from dataclasses import dataclass, field
 
-os.system("cls||clear")
+LETTER_POINTS = {
+    **dict.fromkeys('AEIORST', 1),
+    **dict.fromkeys('DLNU', 2),
+    **dict.fromkeys('GHY', 3),
+    **dict.fromkeys('BCFMPW', 4),
+    **dict.fromkeys('KV', 5),
+    **dict.fromkeys('X', 8),
+    **dict.fromkeys('JQZ', 10),
+}
 
-# Scoring System dictionary - Based on Scrabble scoring system 
 
-guide = [
-    {'letter':' ','point':0},
-    {'letter':"'",'point':0},
-    {'letter':"-",'point':0},
-    {'letter':'A','point':1},
-    {'letter':'B','point':4},
-    {'letter':'C','point':4},
-    {'letter':'D','point':2},
-    {'letter':'E','point':1},
-    {'letter':'F','point':4},
-    {'letter':'G','point':3},
-    {'letter':'H','point':3},
-    {'letter':'I','point':1},
-    {'letter':'J','point':10},
-    {'letter':'K','point':5},
-    {'letter':'L','point':2},
-    {'letter':'M','point':4},
-    {'letter':'N','point':2},
-    {'letter':'O','point':1},
-    {'letter':'P','point':4},
-    {'letter':'Q','point':10},
-    {'letter':'R','point':1},
-    {'letter':'S','point':1},
-    {'letter':'T','point':1},
-    {'letter':'U','point':2},
-    {'letter':'V','point':5},
-    {'letter':'W','point':4},
-    {'letter':'X','point':8},
-    {'letter':'Y','point':3},
-    {'letter':'Z','point':10}
-]
+@dataclass
+class Puzzle:
+    phrase: str
+    category: str
+    attempts: int = 6
+    letter_guesses: set[str] = field(default_factory=set)
+    phrase_guesses: set[str] = field(default_factory=set)
+    solved: bool = False
 
-# create the board
+    def __post_init__(self):
+        self.phrase = self.phrase.strip().upper()
+        if not re.fullmatch(r"[A-Z '-]+", self.phrase) or not any(c.isalpha() for c in self.phrase):
+            raise ValueError("Use letters, spaces, apostrophes, and dashes in the puzzle.")
 
-def print_board():
-    tmp = ""
-    for i in board:
-        tmp += f"{i} "
-    print(tmp)
+    @property
+    def board(self):
+        return ' '.join(
+            char if self.solved or not char.isalpha() or char in self.letter_guesses else '_'
+            for char in self.phrase
+        )
 
-# Guess Letters within the game when started
+    @property
+    def points(self):
+        return sum(LETTER_POINTS.get(char, 0) for char in self.phrase)
 
-def make_guess():
-    counter = 0
-    global guess_wrong
-    option = input("Do you want to guess the puzzle? y/n\n>")
-    if option == 'n':
-        guess = input("Guess a letter: ").upper()
-        if guess in guess_wrong:
-            print("The letter has already been chosen!")
+    def guess(self, value, *, whole_phrase=False):
+        if self.solved or self.attempts <= 0:
+            return 'This round is complete.'
+        value = value.strip().upper()
+        if whole_phrase:
+            if not re.fullmatch(r"[A-Z '-]+", value) or not any(c.isalpha() for c in value):
+                return 'Enter a phrase.'
+            guesses = self.phrase_guesses
+            correct = value == self.phrase
         else:
-            if guess in word:
-                for i in word:
-                    if i == guess:
-                        board[counter] = guess
-                    counter += 1
-                if "_" not in board:
-                    print_board()
-                    os.system("cls||clear")
-                    print("Challenger, you figured it out: " + word)
-                    print("You Win!")
-                    print("You earned " + total_str + " points!")
-                    exit()
-            else:
-                guess_wrong += f" {guess}"
-                global trys
-                trys -= 1
-                if trys == 0:
-                    os.system("cls||clear")
-                    print("The answer was: " + word)
-                    print("Host Player Wins!")
-                    print("You earned " + total_str_host + " points!")
-                    quit()
-    elif option == 'y':
-        guess_answer = input("Guess the answer: ").upper()
-        if guess_answer == word:
-            os.system("cls||clear")
-            print("Challenger, you guessed right: " + word)
-            print("You Win!")
-            print("You earned " + total_str + " points!")
-            quit()
-        elif guess_answer != word:
-            trys -= 1
-            if trys > 0:
-                print("You guessed incorrectly!")
-            else:
-                os.system("cls||clear")
-                print("The answer was: " + word)
-                print("Host Player Wins!")
-                print("You earned " + total_str_host + " points!")
-                quit()
-
-# Game Board Exeptions
-
-def make_space_guess():
-    counter = 0
-    if " " in word:
-        for i in word:
-            if i == " ":
-                board[counter] = " "
-            counter += 1
+            if not re.fullmatch('[A-Z]', value):
+                return 'Enter a single letter.'
+            guesses = self.letter_guesses
+            correct = value in self.phrase
+        if value in guesses:
+            return 'You already tried that.'
+        guesses.add(value)
+        if not correct:
+            self.attempts -= 1
+        self.solved = correct and (whole_phrase or all(
+            not c.isalpha() or c in self.letter_guesses for c in self.phrase
+        ))
+        if self.solved:
+            return f'Solved for {self.points} points.'
+        if not self.attempts:
+            return f'The answer was {self.phrase}. Host earns {max(0, 45 - self.points)} points.'
+        return 'Correct.' if correct else 'Try again.'
 
 
-def make_special_guess():
-    counter = 0
-    if "'" in word:
-        for i in word:
-            if i == "'":
-                board[counter] = "'"
-            counter += 1
+def practice_puzzle():
+    return Puzzle('ON THE FAIRWAY', 'Sport')
 
-def make_special_guess_2():
-    counter = 0
-    if "-" in word:
-        for i in word:
-            if i == "-":
-                board[counter] = "-"
-            counter += 1
 
-# Game Starting Page
+def play(puzzle):
+    print('\n== PHRASE WHEEL ==')
+    while not puzzle.solved and puzzle.attempts:
+        print(f"\nCategory: {puzzle.category} · {puzzle.attempts} misses left")
+        print(puzzle.board)
+        print('Tried:', ' '.join(sorted(puzzle.letter_guesses)) or '—')
+        value = input('Guess a letter, or enter /solve followed by the phrase: ').strip()
+        command, _, phrase = value.partition(' ')
+        if command.lower() == '/solve':
+            print(puzzle.guess(phrase, whole_phrase=True))
+        else:
+            print(puzzle.guess(value))
 
-v = getpass.getpass("(ONLY USE: Letters, Dashes, Spaces, and Apostraphes)\nEnter the phrase/word for the puzzle: ")
-word = v.upper()
-cat = input("What is the Category?\n> ")
-list_word = list(word)
-total = 0
-for i in word:
-    for x in guide:
-        if x['letter'] == i:
-            total += x['point']
 
-total_str = str(total)
-total_str_host = str(45 - total)
-board = []
-trys = 6
-guess_wrong = ""
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--demo', action='store_true', help='Play a built-in practice puzzle.')
+    parser.add_argument('--gui', action='store_true', help='Open the graphical edition.')
+    args = parser.parse_args()
+    try:
+        if args.gui:
+            from graphical import play_graphical
+            play_graphical(practice_puzzle)
+            return
+        if args.demo:
+            play(practice_puzzle())
+            return
+        while True:
+            try:
+                phrase = getpass.getpass('Host: enter a secret phrase: ')
+                puzzle = Puzzle(phrase, input('Category: ').strip() or 'Open category')
+            except ValueError as error:
+                print(error)
+                continue
+            play(puzzle)
+            break
+    except (EOFError, KeyboardInterrupt):
+        print('\nRound ended.')
 
-for i in word:
-    board.append("_")
 
-# Execute Game
-
-make_space_guess()
-make_special_guess()
-make_special_guess_2()
-while True:
-    tx = f"Tries left: {trys} "
-    if guess_wrong:
-        tx += f"\nLetters you have tried: {guess_wrong}"
-    os.system("cls||clear")
-    print("Category: " + cat + "\n" + tx)
-    print_board()
-    make_guess()
+if __name__ == '__main__':
+    main()
